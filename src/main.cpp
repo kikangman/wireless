@@ -13,8 +13,7 @@ Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
     41, 40, 39, 42,
     14, 21, 47, 48, 45,
     9, 46, 3, 8, 16, 1,
-    15, 7, 6, 5, 4
-);
+    15, 7, 6, 5, 4);
 
 Arduino_RPi_DPI_RGBPanel *gfx = new Arduino_RPi_DPI_RGBPanel(
     bus,
@@ -38,15 +37,19 @@ lv_chart_series_t *distanceSeries;
 // 센서 박스 및 값 표시용 라벨
 lv_obj_t *sensorBoxes[8];
 lv_obj_t *sensorValues[8];
+lv_obj_t *sensorLabels[8];
+unsigned long sensorLastUpdate[8]; // 센서별 마지막 수신 시각
 
 #if LV_USE_LOG != 0
-void my_print(const char *buf) {
+void my_print(const char *buf)
+{
   Serial.printf(buf);
   Serial.flush();
 }
 #endif
 
-void ui_DistanceDetailScreen_screen_init() {
+void ui_DistanceDetailScreen_screen_init()
+{
   ui_DistanceDetailScreen = lv_obj_create(NULL);
   lv_obj_clear_flag(ui_DistanceDetailScreen, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -56,9 +59,8 @@ void ui_DistanceDetailScreen_screen_init() {
   lv_obj_t *back_label = lv_label_create(back_btn);
   lv_label_set_text(back_label, "←");
   lv_obj_center(back_label);
-  lv_obj_add_event_cb(back_btn, [](lv_event_t *e) {
-    lv_scr_load(ui_Screen1);
-  }, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(back_btn, [](lv_event_t *e)
+                      { lv_scr_load(ui_Screen1); }, LV_EVENT_CLICKED, NULL);
 
   distanceChart = lv_chart_create(ui_DistanceDetailScreen);
   lv_obj_set_size(distanceChart, 700, 300);
@@ -75,33 +77,57 @@ void ui_DistanceDetailScreen_screen_init() {
 char sensorDataBuffer[64];
 volatile bool sensorDataUpdated = false;
 
-typedef struct struct_message {
+typedef struct struct_message
+{
   int device_id;
   int sensor_type;
-  union {
-    struct { int distance_mm; } distance;
-    struct { float temperature, humidity; } th;
-    struct { float pitch, roll, yaw; } imu;
-    struct { int bpm; } heart;
+  union
+  {
+    struct
+    {
+      int distance_mm;
+    } distance;
+    struct
+    {
+      float temperature, humidity;
+    } th;
+    struct
+    {
+      float pitch, roll, yaw;
+    } imu;
+    struct
+    {
+      int bpm;
+    } heart;
   } data;
 } struct_message;
 
 struct_message incomingData;
 
-void onReceive(const uint8_t *mac_addr, const uint8_t *data, int len) {
-  if (len == sizeof(struct_message)) {
+void onReceive(const uint8_t *mac_addr, const uint8_t *data, int len)
+{
+  if (len == sizeof(struct_message))
+  {
     memcpy(&incomingData, data, sizeof(struct_message));
-    if (incomingData.sensor_type == 0) {
+    if (incomingData.sensor_type == 0)
+    {
       snprintf(sensorDataBuffer, sizeof(sensorDataBuffer), "%d mm", incomingData.data.distance.distance_mm);
-      sensorDataUpdated = true;
-      Serial.printf("📅 [%d] 거리 수신: %s\n", incomingData.device_id, sensorDataBuffer);
     }
-  } else {
+    else
+    {
+      snprintf(sensorDataBuffer, sizeof(sensorDataBuffer), "Other sensor type: %d", incomingData.sensor_type);
+    }
+    sensorDataUpdated = true;
+    Serial.printf("📅 [%d] 거리 수신: %s\n", incomingData.device_id, sensorDataBuffer);
+  }
+  else
+  {
     Serial.printf("❌ 알 수 없는 데이터 (크기: %d)\n", len);
   }
 }
 
-void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
+void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
+{
   uint32_t w = (area->x2 - area->x1 + 1);
   uint32_t h = (area->y2 - area->y1 + 1);
 #if (LV_COLOR_16_SWAP != 0)
@@ -112,23 +138,31 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
   lv_disp_flush_ready(disp);
 }
 
-void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
-  if (touch_has_signal()) {
-    if (touch_touched()) {
+void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
+{
+  if (touch_has_signal())
+  {
+    if (touch_touched())
+    {
       data->state = LV_INDEV_STATE_PR;
       data->point.x = touch_last_x;
       data->point.y = touch_last_y;
-    } else if (touch_released()) {
+    }
+    else if (touch_released())
+    {
       data->state = LV_INDEV_STATE_REL;
     }
-  } else {
+  }
+  else
+  {
     data->state = LV_INDEV_STATE_REL;
   }
 }
 
 unsigned long main_t = 0;
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   String LVGL_Arduino = "Hello Arduino! ";
   LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
@@ -165,9 +199,12 @@ void setup() {
   disp_draw_buf = (lv_color_t *)malloc(sizeof(lv_color_t) * screenWidth * screenHeight / 4);
 #endif
 
-  if (!disp_draw_buf) {
+  if (!disp_draw_buf)
+  {
     Serial.println("LVGL disp_draw_buf allocate failed!");
-  } else {
+  }
+  else
+  {
     lv_disp_draw_buf_init(&draw_buf, disp_draw_buf, NULL, screenWidth * screenHeight / 4);
     lv_disp_drv_init(&disp_drv);
     disp_drv.hor_res = screenWidth;
@@ -185,7 +222,8 @@ void setup() {
     WiFi.mode(WIFI_STA);
     delay(100);
 
-    if (esp_now_init() != ESP_OK) {
+    if (esp_now_init() != ESP_OK)
+    {
       Serial.println("ESP-NOW 초기화 실패!");
       return;
     }
@@ -205,8 +243,24 @@ void loop() {
     int id = incomingData.device_id;
     if (id >= 0 && id < 8 && sensorValues[id]) {
       lv_label_set_text(sensorValues[id], sensorDataBuffer);
+      lv_obj_set_style_bg_color(sensorBoxes[id], lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
+      sensorLastUpdate[id] = millis();
+
+      // 센서 종류 표시
+      if (sensorLabels[id]) {
+        const char *typeText = "Unknown";
+        switch (incomingData.sensor_type) {
+          case 0: typeText = "Distance"; break;
+          case 1: typeText = "Temp/Humid"; break;
+          case 2: typeText = "IMU"; break;
+          case 3: typeText = "Heart"; break;
+        }
+        lv_label_set_text(sensorLabels[id], typeText);
+        Serial.printf("센서 [%d] 타입: %s\n", id, typeText);
+      }
+
     } else {
-      Serial.printf("❗ device_id %d에 대한 레이벨 없음\n", id);
+      Serial.printf("❗ device_id %d에 대한 레이블 없음\n", id);
     }
 
     int distanceVal = 0;
@@ -218,6 +272,16 @@ void loop() {
     }
 
     sensorDataUpdated = false;
+  }
+
+  // 타임아웃 검사
+  unsigned long now = millis();
+  const unsigned long TIMEOUT_MS = 3000;
+  for (int i = 0; i < 8; i++) {
+    if (sensorValues[i] && (now - sensorLastUpdate[i] > TIMEOUT_MS)) {
+      lv_obj_set_style_bg_color(sensorBoxes[i], lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
+      lv_label_set_text(sensorValues[i], "Offline");
+    }
   }
 
   delay(5);
