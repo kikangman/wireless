@@ -42,7 +42,6 @@ lv_obj_t *ui_DistanceDetailScreen;
 lv_obj_t *distanceChart;
 lv_chart_series_t *distanceSeries;
 
-
 #if LV_USE_LOG != 0
 /* Serial debugging */
 void my_print(const char *buf)
@@ -52,8 +51,8 @@ void my_print(const char *buf)
 }
 #endif
 
-
-void ui_DistanceDetailScreen_screen_init() {
+void ui_DistanceDetailScreen_screen_init()
+{
   ui_DistanceDetailScreen = lv_obj_create(NULL);
   lv_obj_clear_flag(ui_DistanceDetailScreen, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -64,9 +63,11 @@ void ui_DistanceDetailScreen_screen_init() {
   lv_obj_t *back_label = lv_label_create(back_btn);
   lv_label_set_text(back_label, "←");
   lv_obj_center(back_label);
-  lv_obj_add_event_cb(back_btn, [](lv_event_t *e){
-    lv_scr_load(ui_Screen1);  // 메인 화면으로 돌아감
-  }, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(back_btn, [](lv_event_t *e)
+                      {
+                        lv_scr_load(ui_Screen1); // 메인 화면으로 돌아감
+                      },
+                      LV_EVENT_CLICKED, NULL);
 
   // 📊 차트 생성
   distanceChart = lv_chart_create(ui_DistanceDetailScreen);
@@ -74,26 +75,52 @@ void ui_DistanceDetailScreen_screen_init() {
   lv_obj_align(distanceChart, LV_ALIGN_CENTER, 0, 30);
 
   lv_chart_set_type(distanceChart, LV_CHART_TYPE_LINE);
-  lv_chart_set_range(distanceChart, LV_CHART_AXIS_PRIMARY_Y, 0, 1000);  // 거리값 범위
+  lv_chart_set_range(distanceChart, LV_CHART_AXIS_PRIMARY_Y, 0, 500); // 거리값 범위
   lv_chart_set_point_count(distanceChart, 50);                         // 50개 포인트 표시
   lv_chart_set_update_mode(distanceChart, LV_CHART_UPDATE_MODE_SHIFT);
 
   distanceSeries = lv_chart_add_series(distanceChart, lv_palette_main(LV_PALETTE_ORANGE), LV_CHART_AXIS_PRIMARY_Y);
 }
 
-
 // 센서 데이터 저장용 전역 변수 및 플래그
 char sensorDataBuffer[64];
 volatile bool sensorDataUpdated = false;
+// 수신용 구조체 정의 (송신기와 동일하게!)
+typedef struct struct_message
+{
+  int device_id;
+  int sensor_type; // 0 = 거리 센서
+
+  union
+  {
+    struct
+    {
+      int distance_mm;
+    } distance;
+  } data;
+} struct_message;
 void onReceive(const uint8_t *mac_addr, const uint8_t *data, int len)
 {
+  // 수신된 데이터가 우리가 예상한 구조체 크기인지 확인
+  if (len == sizeof(struct_message))
+  {
+    struct_message incomingData;
+    memcpy(&incomingData, data, sizeof(struct_message));
 
-  int copyLen = min(len, (int)(sizeof(sensorDataBuffer) - 1)); // <-- 타입 캐스팅 추가
-  memcpy(sensorDataBuffer, data, copyLen);
-  sensorDataBuffer[copyLen] = '\0';
+    // 센서 타입이 거리 센서(0)일 경우
+    if (incomingData.sensor_type == 0)
+    {
+      // 거리 값을 문자열로 변환해서 UI에 표시
+      snprintf(sensorDataBuffer, sizeof(sensorDataBuffer), "%d mm", incomingData.data.distance.distance_mm);
+      sensorDataUpdated = true;
 
-  sensorDataUpdated = true;
-  Serial.printf("수신된 메시지: %s\n", sensorDataBuffer);
+      Serial.printf("📥 [%d] 거리 수신: %s\n", incomingData.device_id, sensorDataBuffer);
+    }
+  }
+  else
+  {
+    Serial.printf("❌ 알 수 없는 데이터 (크기: %d)\n", len);
+  }
 }
 
 /* Display flushing */
@@ -220,7 +247,7 @@ void setup()
       return;
     }
 
-    esp_now_register_recv_cb(onReceive);  // 올바르게 바뀐 콜백함수
+    esp_now_register_recv_cb(onReceive); // 올바르게 바뀐 콜백함수
     Serial.println("ESP-NOW 초기화 완료, 데이터 수신 대기중...");
 
     Serial.println("Setup done");
@@ -237,20 +264,20 @@ void loop()
   if (sensorDataUpdated)
   {
     lv_label_set_text(valueLabel, sensorDataBuffer); // 기존 텍스트 표시
-  
+
     // 🔢 차트용 숫자 추출
     int distanceVal = 0;
     sscanf(sensorDataBuffer, "%d", &distanceVal); // "123 mm" -> 123
-  
+
     // 📈 차트에 값 추가 (상세 화면일 경우만)
     if (distanceChart && distanceSeries)
     {
       lv_chart_set_next_value(distanceChart, distanceSeries, distanceVal);
       lv_chart_refresh(distanceChart);
     }
-  
+
     sensorDataUpdated = false;
   }
-  
+
   delay(5);
 }
