@@ -4,10 +4,13 @@
 // Project name: esp32_7inch
 
 #include "../ui.h"
+lv_obj_t *sensorBoxes[8];
+lv_obj_t *sensorLabels[8];
+lv_obj_t *sensorValues[8];
 void distance_box_event_cb(lv_event_t *e)
 {
-    ui_DistanceDetailScreen_screen_init();  // 화면 초기화
-    lv_scr_load(ui_DistanceDetailScreen);   // 상세 화면으로 전환
+    ui_DistanceDetailScreen_screen_init(); // 화면 초기화
+    lv_scr_load(ui_DistanceDetailScreen);  // 상세 화면으로 전환
 }
 
 void ui_Screen1_screen_init(void)
@@ -15,56 +18,58 @@ void ui_Screen1_screen_init(void)
     ui_Screen1 = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);
 
-    // 🔵 상단 타이틀 "WIRELESS"
+    // 상단 타이틀 "WIRELESS" 표시
     ui_Label1 = lv_label_create(ui_Screen1);
     lv_label_set_text(ui_Label1, "WIRELESS");
     lv_obj_set_style_text_font(ui_Label1, &ui_font_Font2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align(ui_Label1, LV_ALIGN_TOP_MID, 0, 40);
 
-    // 📦 박스 생성
-    lv_obj_t *box1 = lv_btn_create(ui_Screen1);
-    lv_obj_set_size(box1, 140, 140);
-    lv_obj_set_pos(box1, 30, 125);
+    // 8개의 센서 박스를 4열 2행으로 생성
+    const int BOX_COLS = 4;
+    const int BOX_ROWS = 2;
+    const int BOX_COUNT = 8;
+    const int BOX_WIDTH = 140;
+    const int BOX_HEIGHT = 140;
+    const int GAP = 20;
 
-    lv_obj_set_style_bg_color(box1, lv_color_hex(0xFD7E14), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(box1, 3, 0);
-    lv_obj_set_style_border_color(box1, lv_color_hex(0x984A0D), 0);
+    // 화면 크기 설정 (필요에 따라 조정, 예: 800x480)
+    int screenW = 800;
+    int screenH = 480;
 
-    // Distance 박스 클릭 시 차트 상세 화면으로 전환
-    lv_obj_add_event_cb(box1, distance_box_event_cb, LV_EVENT_CLICKED, NULL);
+    // 전체 그리드 영역 계산 및 시작 좌표 결정
+    int totalWidth = BOX_COLS * BOX_WIDTH + (BOX_COLS - 1) * GAP;
+    int totalHeight = BOX_ROWS * BOX_HEIGHT + (BOX_ROWS - 1) * GAP;
+    int startX = (screenW - totalWidth) / 2;
+    int startY = 120; // 상단 오프셋
 
+    for (int i = 0; i < BOX_COUNT; i++)
+    {
+        int col = i % BOX_COLS;
+        int row = i / BOX_COLS;
+        int posX = startX + col * (BOX_WIDTH + GAP);
+        int posY = startY + row * (BOX_HEIGHT + GAP);
 
-    // 🏷️ 상단 텍스트: Distance (더 위쪽으로)
-    lv_obj_t *label1 = lv_label_create(box1);
-    lv_label_set_text(label1, "Distance");
-    lv_obj_set_style_text_color(label1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(label1, LV_ALIGN_TOP_MID, 0, 2); // 기존 10 → 2로 더 위로 붙임
+        sensorBoxes[i] = lv_btn_create(ui_Screen1);
+        lv_obj_set_size(sensorBoxes[i], BOX_WIDTH, BOX_HEIGHT);
+        lv_obj_set_pos(sensorBoxes[i], posX, posY);
 
-    // 📟 센서값 텍스트: 123 cm (살짝 아래, 글자 크게)
-    valueLabel = lv_label_create(box1);
-    lv_label_set_text(valueLabel, "123 mm");
-    lv_obj_set_style_text_font(valueLabel, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT); //
-    lv_obj_set_style_text_color(valueLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(valueLabel, LV_ALIGN_CENTER, 0, 8); // 중심보다 아래로
+        // 미사용(기본) 상태: 회색 배경
+        lv_obj_set_style_bg_color(sensorBoxes[i], lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(sensorBoxes[i], 3, 0);
+        lv_obj_set_style_border_color(sensorBoxes[i], lv_color_hex(0x000000), 0);
 
-    // 두 번째 박스 (IMU 센서용)
-    lv_obj_t *box2 = lv_btn_create(ui_Screen1);
-    lv_obj_set_size(box2, 140, 140);
-    lv_obj_set_pos(box2, 210, 125);                                                           // 오른쪽으로 배치
-    lv_obj_set_style_bg_color(box2, lv_color_hex(0x007BFF), LV_PART_MAIN | LV_STATE_DEFAULT); // 오렌지색
-    lv_obj_set_style_border_width(box2, 3, 0);
-    lv_obj_set_style_border_color(box2, lv_color_hex(0x003B75), 0);
+        // 센서 종류를 표시할 상단 레이블 (초기 빈 문자열)
+        sensorLabels[i] = lv_label_create(sensorBoxes[i]);
+        lv_label_set_text(sensorLabels[i], "");
+        lv_obj_align(sensorLabels[i], LV_ALIGN_TOP_MID, 0, 2);
 
-    // 박스 상단 텍스트: "IMU"
-    lv_obj_t *label2 = lv_label_create(box2);
-    lv_label_set_text(label2, "IMU");
-    lv_obj_set_style_text_color(label2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(label2, LV_ALIGN_TOP_MID, 0, 2);
+        // 센서 값을 표시할 중앙 레이블
+        sensorValues[i] = lv_label_create(sensorBoxes[i]);
+        lv_label_set_text(sensorValues[i], "");
+        lv_obj_set_style_text_font(sensorValues[i], &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_align(sensorValues[i], LV_ALIGN_CENTER, 0, 0);
 
-    // IMU 값 표시용 라벨: 기본값 "R:0°\nP:0°\nY:0°"
-    valueLabel2 = lv_label_create(box2);
-    lv_label_set_text(valueLabel2, "R : 0°\nP : 0°\nY : 0°");
-    lv_obj_set_style_text_font(valueLabel2, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(valueLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(valueLabel2, LV_ALIGN_CENTER, 0, 10);
+        // ADD EVENT CALLBACK: Attach event callback to each sensor box so that tapping it loads the detailed screen
+        lv_obj_add_event_cb(sensorBoxes[i], distance_box_event_cb, LV_EVENT_CLICKED, NULL);
+    }
 }
